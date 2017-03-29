@@ -209,8 +209,8 @@ JetPackage : Public == Private where
       out
       -- betastar
 )if false
-)cd /home/marcle/Home/axiom
-)co Jet2.spad
+)cd /home/marcle/src/lisp/autodiff
+)co Jet.spad
 
 beta0 := [a=0.1, b=0.2] :: List Equation Expression Float
 beta  := [a=0.1, b=0.2] :: List Equation Expression Jet Float
