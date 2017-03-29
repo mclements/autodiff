@@ -1,0 +1,423 @@
+)abbrev domain JET Jet
+Jet(T: Join(PartialOrder,Ring)): Public == Private where
+  Public ==> Join(PartialOrder,IntegralDomain) with
+    jet: (T, T) -> %
+      ++ construct a jet value from a pair
+    jet: (T) -> %
+      ++ construct a jet value with delta=0
+    elt: (%, "value") -> T
+      ++ retrieve the value field of a jet
+    elt: (%, "delta") -> T
+     ++ retrieve the delta field of a jet
+    setelt: (%, "value", T) -> T
+      ++ set the value field of a jet
+    setelt: (%, "delta", T) -> T
+      ++ set the delta field of a jet
+    coerce: T -> %
+      ++ coerce from T to %
+    Zero: () -> %
+      ++ zero element
+    One: () -> %
+      ++ one element
+    if T has PartialOrder then PartialOrder
+    if T has Comparable then Comparable
+    if T has OrderedRing then OrderedRing
+    if T has RetractableTo Integer then RetractableTo Integer
+    if T has RetractableTo Fraction Integer then RetractableTo Fraction Integer
+    if T has Field then
+      "exquo": (%,%) -> Union(%,"failed")
+      "/": (%, %) -> %
+      "/": (T, %) -> %
+      "/": (%, T) -> %
+      "^": (%, Integer) -> %
+      "^": (%, Fraction Integer) -> %
+    if T has TranscendentalFunctionCategory and T has Field and T has RadicalCategory then
+      -- RadicalCategory and Field are *not* required for differentiating all of TranscendentalFunctionCategory;
+      -- this is done for conciseness.
+      TranscendentalFunctionCategory
+      "^": (T, %) -> %
+      "^": (%, T) -> %
+    if T has RadicalCategory and T has Field then
+      sqrt: % -> %
+    if T has LiouvillianFunctionCategory and T has Field and T has RadicalCategory and T has TranscendentalFunctionCategory then
+      erf: % -> %
+      pnorm: (%) -> %
+        ++ pnorm(x) is the CDF at x for a standard normal distribution with a mean 0 and variance 1
+      pnorm: (%, %, %) -> %
+        ++ pnorm(x,mu,sigma) is the CDF at x for a normal distribution with a mean mu and variance sigma^2
+  Private ==> add
+    x, y : % 
+    z : T
+    n : Integer
+    Rep := Record(val: T, der: T)
+    jet(v,d) == [v, d]
+    jet(v) == jet(v, 1$T) -- is this the right default?
+    coerce(z) == jet(z, 0$T)
+    coerce(n) == jet(n::T, 0$T)
+    elt(jet: %, key: "value") == jet.val    
+    elt(jet: %, key: "delta") == jet.der
+    setelt(jet: %, key: "value", jetValue: T) == jet.val := jetValue
+    setelt(jet: %, key: "delta", jetDelta: T) == jet.der := jetDelta
+    -- if T has Ring then
+    Zero() == jet(0$T, 0$T)
+    One() == jet(1$T, 0$T)
+    x + y == jet(x.value + y.value, x.delta + y.delta)
+    x - y == jet(x.value - y.value, x.delta - y.delta)
+    x * y == jet(x.value * y.value, x.delta*y.value + x.value*y.delta)
+    n * y == jet(n * y.value, n*y.delta)
+    -x == jet(-x.value, -x.delta)
+    if T has Comparable then
+      x = y == x.value = y.value and x.delta=y.delta
+      hash x == hash(x.value)+hash(x.delta)
+      coerce(x):OutputForm == 
+        hconcat(('jet)::OutputForm, paren [ (x.value)::OutputForm, (x.delta)::OutputForm ])
+      latex x == 
+        concat ["jet(", latex(x.value), "," latex(x.delta), ")"]
+      if T has PartialOrder then
+        smaller?(x,y) == x.value<y.value or (x.value=y.value and x.delta<y.delta)
+      else 
+        smaller?(x,y) == false
+    if T has PartialOrder then
+      x <= y == x.value <= y.value or (x.value = y.value and x.delta <= y.delta)
+    if T has OrderedRing then
+      abs x == jet(abs(x.value), sign(x.value)*x.delta)
+    if T has RetractableTo Integer then
+      coerce(n:Integer):% == jet(n::T,0$T)
+      retract(x):Integer == retract(x.value)@Integer
+      retractIfCan(x):Union(Integer,"failed") == retractIfCan(x.value)@Union(Integer,"failed")
+    if T has RetractableTo Fraction Integer then
+      coerce(f:Fraction Integer):% == jet(f::T,0$T)
+      retract(x):Fraction Integer == retract(x.value)@Fraction(Integer)
+      retractIfCan(x):Union(Fraction Integer,"failed") == retractIfCan(x.value)@Union(Fraction Integer,"failed")
+    if T has Field and T has RetractableTo Integer and T has RetractableTo Fraction Integer then
+      x exquo y == 
+        y.value=0 => "failed"
+	x/y
+      x / y == 
+        r : T := x.value / y.value
+	jet(r, (x.delta - r * y.delta) / y.value)
+      x / z == 
+	jet(x.value / z, x.delta / z)
+      z / x == 
+	jet(z / x.value, -z*x.delta / x.value / x.value)
+      x ^ (n:Integer) == 
+        jet(x.value ^ n, n*x.value^(n-1)*x.delta)
+    if T has TranscendentalFunctionCategory and T has Field and T has RadicalCategory and T has RetractableTo Fraction Integer then
+      x ^ (frac:Fraction Integer) == x^(frac::T)
+    if T has TranscendentalFunctionCategory and T has Field and T has RadicalCategory then
+      -- extras
+      z ^ x == jet(z ^ x.value, log(z)*z^x.value*x.delta)
+      x ^ z == jet(x.value ^ z, x.delta*z*x.value^(z-1))
+      -- TranscendentalFunctionCategory
+      x ^ y == jet(x.value ^ y.value, log(x.value)*x.value^y.value*y.delta + x.delta*y.value*x.value^(y.value-1))
+      acos x == jet(acos(x.value), -x.delta/sqrt(1-x.value*x.value))
+      acosh x == jet(acosh(x.value), x.delta/sqrt(x.value*x.value-1))
+      acot x == jet(acot(x.value), -x.delta/(1+x.value*x.value))
+      acoth x == jet(acoth(x.value), -x.delta/(x.value*x.value-1))
+      acsc x == jet(acsc(x.value), -x.delta/(x.value*sqrt(x.value*x.value-1)))
+      acsch x == jet(acsch(x.value), -x.delta/(x.value*sqrt(x.value*x.value+1)))
+      asec x == jet(asec(x.value), x.delta/(x.value*sqrt(x.value*x.value-1)))
+      asech x == jet(asech(x.value), -x.delta/(x.value*sqrt(1-x.value*x.value)))
+      asin x == jet(asin(x.value), x.delta/sqrt(1-x.value*x.value))
+      asinh x == jet(asinh(x.value), x.delta/sqrt(1+x.value*x.value))
+      atan x == jet(atan(x.value), x.delta/(1+x.value*x.value))
+      atanh x == jet(atanh(x.value), -x.delta/(x.value*x.value-1))
+      cos x == jet(cos(x.value), -x.delta*sin(x.value))
+      cosh x == jet(cosh(x.value), x.delta*sinh(x.value))
+      cot x == jet(cot(x.value), -x.delta*(1+cot(x.value)*cot(x.value)))
+      coth x == jet(coth(x.value), x.delta*(1-coth(x.value)*coth(x.value)))
+      csc x == jet(csc(x.value), -x.delta*csc(x.value)*cot(x.value))
+      csch x == jet(csch(x.value), -x.delta*csch(x.value)*coth(x.value))
+      exp x == jet(exp(x.value), x.delta*exp(x.value))
+      log x == jet(log(x.value), x.delta/x.value)
+      pi() == jet(pi()$T,0$T)
+      sec x == jet(sec(x.value), x.delta*sec(x.value)*tan(x.value))
+      sech x == jet(sech(x.value), -x.delta*sech(x.value)*tanh(x.value))
+      sin x == jet(sin(x.value), x.delta*cos(x.value))
+      sinh x == jet(sinh(x.value), x.delta*cosh(x.value))
+      tan x == jet(tan(x.value), x.delta*(1+tan(x.value)*tan(x.value)))
+      tanh x == jet(tanh(x.value), x.delta*(1-tanh(x.value)*tanh(x.value)))
+    if T has RadicalCategory and T has Field then
+      sqrt x == jet(sqrt(x.value), x.delta/sqrt(x.value)/(1+1))
+    if T has LiouvillianFunctionCategory and T has Field and T has RadicalCategory and T has TranscendentalFunctionCategory then
+      erf x == jet(erf(x.value), (1+1)*exp(-x.value*x.value)*x.delta/sqrt(pi()))
+      pnorm x == (1 + erf(x/sqrt(1+1)))/(1+1)
+      pnorm(x,mu,sigma) == pnorm((x-mu)/sigma)
+
+)abbrev package JETPACK JetPackage
+JetPackage : Public == Private where
+  Public == with
+    erf : Jet Float -> Jet Float
+    pnorm : Jet Float -> Jet Float
+    gradient : (Vector Jet Float, Vector Jet Float -> Jet Float) -> Vector Float
+    gradient : (List Equation Expression Jet Float, Expression Jet Float) -> Vector Expression Jet Float
+    hessian : (List Equation Expression Jet Float, Expression Jet Float) -> Matrix Expression Jet Float
+    -- hessian : (List Equation Expression Jet Float, Expression Jet Float) -> List Equation Expression Jet Float
+    elt : (Expression Jet Float, "value") -> Float
+    elt : (Expression Jet Float, "delta") -> Float
+  Private == add
+    JF ==> Jet Float
+    EJF ==> Expression Jet Float
+    LEEJF ==> List Equation Expression Jet Float
+    import Jet Float
+    import FloatLiouvilianFunctions -- erf: Float->Float
+    import Pi -- pi(): () -> Float
+    elt(x:EJF, key : "value") == ground(x).value
+    elt(x:EJF, key : "delta") == ground(x).delta
+    erf x == jet(erf(x.value), (1+1)*exp(-x.value*x.value)*x.delta/sqrt(pi()))
+    pnorm x == (1 + erf(x/sqrt(1+1)))/(1+1)
+    gradient(beta: Vector Jet Float, f : (Vector Jet Float -> Jet Float)):Vector(Float) ==
+      out := new(#beta, 0.0)$Vector(Float)
+      for i in 1..#beta repeat
+        betastar := beta
+	betastar(i) := jet(beta.i.value, 1.0)
+        out(i) := f(betastar).delta
+      out
+    gradient(beta: LEEJF, expr : EJF):Vector(EJF) ==
+      out := new(#beta, 0$EJF)$Vector(EJF)
+      for i in 1..#beta repeat
+        betastar := copy beta
+	betai := elt(beta,i)
+	v := jet(rhs(betai).value, 1$Float) :: EJF
+	setelt!(betastar,i, lhs(betai) = v)
+        out(i) := eval(expr, betastar)
+      out
+    -- BUGGY!
+    hessian(beta: LEEJF, expr : EJF):Matrix(EJF) ==
+    -- hessian(beta: LEEJF, expr : EJF):LEEJF ==
+      import Matrix EJF
+      out := new(#beta, #beta, 0$EJF)$Matrix(EJF)
+      for i in 1..#beta repeat
+        betai := elt(beta,i)
+      	vi := jet(rhs(betai).value, 1$Float) :: EJF
+        for j in i..#beta repeat
+          betastar := copy beta
+	  if i=j then
+	    betastar := delete(betastar, i)
+	    expr2 := D(eval(expr, betastar), lhs(betai) pretend Symbol, 1)
+	  else
+	    setelt!(betastar,i, lhs(betai) = vi)
+    	    betastar := delete(betastar, j)
+    	    expr2 := eval(expr, betastar)
+          betaj := elt(beta,j)
+  	  vj := jet(rhs(betaj).value, 1$Float) :: EJF
+          betastar := copy beta
+    	  setelt!(betastar,j, lhs(betaj) = vj)
+          out(i,j) := eval(expr2, betastar) 
+          -- out(i,j) := expr2
+	  out(j,i) := out(i,j)
+      out
+      -- betastar
+)if false
+)cd /home/marcle/Home/axiom
+)co Jet2.spad
+
+beta0 := [a=0.1, b=0.2] :: List Equation Expression Float
+beta  := [a=0.1, b=0.2] :: List Equation Expression Jet Float
+expr0 := exp(2*a+b) 
+expr := expr0 :: Expression Jet Float
+eval(expr, beta0)
+eval(expr, beta)
+vector [eval(D(expr0,a), beta0), eval(D(expr0,b), beta0)]
+gradient(beta0, expr0) -- ok
+matrix [[eval(D(D(expr0,a),a), beta0), eval(D(D(expr0,a),b), beta0)],[eval(D(D(expr0,b),a), beta0), eval(D(D(expr0,b),b), beta0) ]]
+hessian(beta, expr) -- nope
+
+betastar := copy beta0
+betastar := delete(betastar,1)
+expr2 := D(eval(expr,betastar),a,1)
+betastar2 := copy beta0
+betastar2 := delete(betastar2,2)
+betastar2 := [a = (jet(rhs(betastar2.1), 1$Float) :: Expression Jet Float)]
+eval(expr2, betastar2) 
+
+
+JF ==> Jet Float
+EJF ==> Expression Jet Float
+LEEJF ==> List Equation EJF
+beta := [a=0.1, b=0.2] :: LEEJF
+expr : EJF := exp(a+b)
+i := 1
+betastar : LEEJF := beta
+betastar(i) := (lhs beta(i)) = jet((ground rhs beta i).value, 1.0) :: EJF
+eval(expr, betastar)
+
+gradient([1.0,2.0], x +-> x.1 + exp(x.2))
+x := [2,3]::Vector Jet Float
+gradient([0.1, 0.2], b +-> exp(dot(x,b)))
+
+eval(D(D(exp(2*a+b),a),b), [a=0.1, b=0.2])
+eval(eval(exp(2*a+b),a=jet(0.1)), b=0.2)
+-- second derivatives - symbolically?
+eval(D(D(exp(2*a+b),a),a), [a=0.1, b=0.2])
+eval(D(exp(2*a+b),a),[a=jet(0.1),b=0.2])
+
+eval(D(x^(2*x),x), x=2.0)
+jet(2.0)^(2*jet(2.0))
+
+-- constructors
+jet(1.0,2.0)
+jet(1.0)
+0$Jet Float
+latex 1$Jet DoubleFloat
+0$Jet Float < 1$Jet Float
+jet(1.0) exquo 0
+jet(2.0,1.0)<=jet(2.0,1.0)
+jet(1,2) <= jet(1,3)
+
+-- some functions
+cos(jet(1.0)*pi())
+erf(jet(2.0))
+2*jet(2)
+log(jet(2.0))
+pnorm(jet(1.96))
+pnorm(1+2*jet(1.96),1,2)
+
+erf(1.0)
+erf(1.0 :: Expression Float)
+interpret(erf(1.0 :: Expression Float) :: InputForm)
+erf(1.0 :: Expression Float)^2
+erf(jet(1.0)) -- ok
+pnorm(jet(1.0))
+pnorm(jet(1.0)::Expression Jet Float)^2
+pnorm(jet(1.0)::Expression Jet Float)
+erf(jet(1.0)::Expression Jet Float)
+expr @ Jet Float -- fails
+)set mess bot on
+interpret(eval(erf(x),x=jet(1.0)) :: InputForm)
+eval(myerf(x)^2,x=jet(1.0)) 
+
+-- coerce and use vectors
+reduce(+, vector [1,2,3*jet(3)]) -- cool!
+reduce(+, vector [1,2,3*jet(3.0)]) -- cool!
+vector [1,2,3] :: Vector Jet Float -- ok
+
+-- testing
+testDeriv(f,val) == 
+  fjet : Jet Float := f(jet(val))
+  (f(val)-fjet.value, eval(D(f(x),x),x=val) - fjet.delta)
+testDeriv(log,2.0)
+testDeriv(exp,2.0)
+testDeriv(-,2.0)
+testDeriv(x +-> exp(exp(x)),2.0)
+testDeriv(sin,2.0)
+testDeriv(cos,2.0)
+testDeriv(tan,2.0)
+testDeriv(sinh,2.0)
+testDeriv(cosh,2.0)
+testDeriv(tanh,2.0)
+testDeriv(asin,0.1)
+testDeriv(acos,0.1)
+testDeriv(atan,0.1)
+testDeriv(x +-> x^(2*x),2.0)
+testDeriv(x +-> x^(x*2),2.0)
+testDeriv(x +-> x^3,3.0)
+testDeriv(sqrt,2.0)
+testDeriv(x +-> exp(x)/sqrt(x),2.0)
+testDeriv(x +-> exp(x)*sqrt(x),2.0)
+testDeriv(x +-> x*x,2.0)
+testDeriv(x +-> x+x,2.0)
+testDeriv(x +-> 10*x,2.0)
+
+-- some more functions
+)set message time on
+g(x) == (1+x)^10000
+gx := g(x); -- slow expansion
+eval(D(gx,x), x=0.1) -- slow symbolic differentiation
+eval(gx, x=jet(0.1)) -- also slow - but faster than D(gx,x) 
+g(jet(0.1)) -- fast algorithmic differentiation!
+)set message time off
+-- g(jet(0.1::DoubleFloat)) -- FLOATING-POINT-OVERFLOW error
+-- g(jet(x)$Jet(Expression Float)) -- very slow
+
+)set message time on
+g(x) ==
+  expr := 1+x
+  for i in 1..10000 repeat
+    expr := expr*(1+x)
+  expr
+g(jet(0.1))
+eval(D(g(x),x),x=0.1)
+)set message time off
+
+
+)set message time on
+g(x) ==
+  expr := 1
+  for i in 1..1000 repeat
+    expr := expr+x^i/factorial(i)
+  expr
+g(1.0)
+g(jet(1.0)) - jet(1.0)*exp(1.0)
+eval(D(g(x),x),x=1.0) - exp(1.0)
+)set message time off
+
+-- and more functions
+g(x) == x^exp(x)^exp(x)
+gx := g(x);
+eval(D(gx,x),x=0.1)
+g(jet(0.1))
+g(jet(0.1::DoubleFloat))
+eval(x^exp(x)^exp(x), x=jet(0.1))
+eval(x^erf(x)^erf(x), x=jet(0.1)) -- Oops: Expression Jet Float
+
+-- calling an interpreter function
+fx(x, n) ==
+  if n=0 then return 0*x
+  else
+    a := 0*x
+    b := x
+    (a,b) := (0, x)
+    for k in 1..(n-1) repeat
+      h := b
+      b := log(a+b)
+      a := h
+    b
+eval(D(fx(x,7),x), x=2.0)
+fx(jet(2.0,1.0), 7)
+
+-- eval now works; eval() requires PartialOrder and IntegralDomain (or similar?)
+beta = jet(1.0) -- ok
+eval((beta+1)^2,beta=jet(1.0)) -- ok
+subst((beta+1)^2,beta=jet(1.0)) -- ok
+eval(exp(2*beta),beta=jet(1.0)) -- ok
+
+-- Extended example: partial log-likelihood
+-- Assume distinct ordered times
+l(beta) == 
+  event := [true,false,false,true,true,false]
+  times := [i*1.0 for i in 1..#event]
+  x := [1.0,0,1,1,0,1]
+  eta := [beta*xi for xi in x]
+  index := [i for i in 1..#event for e in event | e]
+  -- L := reduce(*,[exp(eta(i))/reduce(+,[exp(eta(j)) for j in i..#event]) for i in index])
+  reduce(+,[eta(i) - log(reduce(+,[exp(eta(j)) for j in i..#event])) for i in index])
+l(jet(1.0))
+eval(l(beta), beta=jet(1.0)) -- ok
+-- time-varying effect
+f(beta,gamma) == reduce(+,[x.i*beta+x.i*times.i*gamma - log(reduce(+,[exp(x.j*beta+x.j*times.j*gamma) for j in i..#event])) for i in index])
+f(jet(1.0),0)
+f(jet(1.0),3.0)
+
+--
+-- check some operators
+g := operator 'g
+h := operator 'h
+Dgx(f) == (f,D(f(g(x)),x))
+Dgx2(f) == (f,D(f(g(x),h(x)),x))
+[Dgx(acos), Dgx(acosh), Dgx(acot), Dgx(acoth), Dgx(acsc), Dgx(acsch), Dgx(asec), Dgx(asech), Dgx(asin), Dgx(asinh), Dgx(atan), Dgx(atanh), Dgx(cos), Dgx(cosh), Dgx(cot), Dgx(coth), Dgx(csc), Dgx(csch), Dgx(exp), Dgx(log), Dgx(sec), Dgx(sech), Dgx(sin), Dgx(sinh), Dgx(tan), Dgx(tanh), Dgx(sqrt), Dgx(-), Dgx(h)]
+)sh TranscendentalFunctionCategory
+
+[Dgx(Chi), Dgx(Ci), Dgx(Ei), Dgx(Shi), Dgx(Si), Dgx(erf), Dgx(erfi), Dgx(fresnelC), Dgx(fresnelS), Dgx(li)]
+)sh FloatLiouvilianFunctions
+[Dgx2(Beta), Dgx(Gamma), Dgx(airyAi)]
+)sh SPFCAT
+Dgx(erf)
+
+-- finite differences
+fd(f,x) ==
+  eps:=1.0e-10
+  (f(x+eps) - f(x-eps))/2.0/eps
+fd(log,1.1)
+  
+)endif
